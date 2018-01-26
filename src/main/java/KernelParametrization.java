@@ -32,7 +32,7 @@ public class KernelParametrization {
     private SimpleDataset testSet;
     private SimpleDataset trainingSet;
 
-    public void execute(String kernelType) throws Exception {
+    public Kernel getKernel(String kernelType, float[] params) throws Exception {
 
         // Read the training and test dataset
         trainingSet = new SimpleDataset();
@@ -55,66 +55,54 @@ public class KernelParametrization {
         // Initialize the proper kernel function
         if (kernelType.equalsIgnoreCase("poly")) {
             String vectorRepresentationName = "bow";
+            Kernel linearKernel = new LinearKernel(vectorRepresentationName);
+            usedKernel = new PolynomialKernel(params[0], linearKernel);
+
+        } else if (kernelType.equalsIgnoreCase("tk")) {
+            String treeRepresentationName = "grct";
+            usedKernel = new SubSetTreeKernel(params[0], treeRepresentationName);
+
+        } else if (kernelType.equalsIgnoreCase("comb")) {
+            String vectorRepresentationName = "bow";
+            String treeRepresentationName = "grct";
+            Kernel linearKernel = new LinearKernel(vectorRepresentationName);
+            Kernel tkgrct = new SubSetTreeKernel(params[0], treeRepresentationName);
+
+            LinearKernelCombination combination = new LinearKernelCombination();
+            combination.addKernel(1, linearKernel);
+            combination.addKernel(1, tkgrct);
+            usedKernel = combination;
+
+        } else if (kernelType.equalsIgnoreCase("comb-norm")) {
+            String vectorRepresentationName = "bow";
+            String treeRepresentationName = "grct";
 
             Kernel linearKernel = new LinearKernel(vectorRepresentationName);
+            Kernel normalizedLinearKernel = new NormalizationKernel(linearKernel);
+            Kernel treeKernel = new SubSetTreeKernel(params[0], treeRepresentationName);
+            Kernel normalizedTreeKernel = new NormalizationKernel(treeKernel);
 
-            for (int exp = 2; exp < 6; exp++) {
-                usedKernel = new PolynomialKernel(exp, linearKernel);
-                evaluateExponent(usedKernel, kernelType, exp);
-            }
+            LinearKernelCombination combination = new LinearKernelCombination();
+            combination.addKernel(1, normalizedLinearKernel);
+            combination.addKernel(1, normalizedTreeKernel);
+            combination.normalizeWeights();
+
+            usedKernel = combination;
 
         } else {
-
-            for (float lambda = 0.1f; lambda < 1; lambda += 0.1f) {
-
-                if (kernelType.equalsIgnoreCase("tk")) {
-                    String treeRepresentationName = "grct";
-                    usedKernel = new SubSetTreeKernel(lambda, treeRepresentationName);
-
-                } else if (kernelType.equalsIgnoreCase("comb")) {
-                    String vectorRepresentationName = "bow";
-                    String treeRepresentationName = "grct";
-                    Kernel linearKernel = new LinearKernel(vectorRepresentationName);
-                    Kernel tkgrct = new SubSetTreeKernel(lambda, treeRepresentationName);
-
-                    LinearKernelCombination combination = new LinearKernelCombination();
-                    combination.addKernel(1, linearKernel);
-                    combination.addKernel(1, tkgrct);
-                    usedKernel = combination;
-
-                } else if (kernelType.equalsIgnoreCase("comb-norm")) {
-                    String vectorRepresentationName = "bow";
-                    String treeRepresentationName = "grct";
-
-                    Kernel linearKernel = new LinearKernel(vectorRepresentationName);
-                    Kernel normalizedLinearKernel = new NormalizationKernel(linearKernel);
-                    Kernel treeKernel = new SubSetTreeKernel(lambda, treeRepresentationName);
-                    Kernel normalizedTreeKernel = new NormalizationKernel(treeKernel);
-
-                    LinearKernelCombination combination = new LinearKernelCombination();
-                    combination.addKernel(1, normalizedLinearKernel);
-                    combination.addKernel(1, normalizedTreeKernel);
-                    combination.normalizeWeights();
-
-                    usedKernel = combination;
-
-                } else {
-                    System.err.println("The specified kernel (" + kernelType + ") is not valid.");
-                    System.exit(0);
-                }
-
-                evaluateLambda(usedKernel, kernelType, lambda);
-            }
+            System.err.println("The specified kernel (" + kernelType + ") is not valid.");
+            System.exit(0);
         }
 
+        return usedKernel;
     }
 
-    private void evaluateExponent(Kernel kernel, String usedKernel, int exp) throws IOException {
-        List<MulticlassClassificationEvaluator> nfoldEv = getNFoldEvaluator(kernel);
+    public void evaluateParams(Kernel kernel, String usedKernel, float[] params) throws IOException {
+        List<MulticlassClassificationEvaluator> nfoldEv = getNFoldEvaluator(kernel, params[1]);
         String out = String.format("%s_%s.txt", DataConfiguration.getOutputFilename(), usedKernel);
 
         PrintWriter writer = Utils.FileUtils.openOutFile(out);
-        writer.append(String.format("Exponent=%s\n\r", exp));
+        writer.append(String.format("param=%s\n\r", params[0]));
 
         float[] accuracy = new float[nfoldEv.size()];
         float[] precisions = new float[nfoldEv.size()];
@@ -137,37 +125,7 @@ public class KernelParametrization {
         writer.close();
     }
 
-    private void evaluateLambda(Kernel kernel, String usedKernel, Float lambda) throws FileNotFoundException, UnsupportedEncodingException {
-        List<MulticlassClassificationEvaluator> nfoldEv = getNFoldEvaluator(kernel);
-        String out = String.format("%s_%s_%s.txt", DataConfiguration.getOutputFilename(), usedKernel, lambda);
-
-        PrintWriter writer = Utils.FileUtils.openOutFile(out);
-        writer.append("lambda=" + lambda);
-        writer.append("\n");
-
-        float[] accuracy = new float[nfoldEv.size()];
-        float[] precisions = new float[nfoldEv.size()];
-        float[] recalls = new float[nfoldEv.size()];
-        float[] f1s = new float[nfoldEv.size()];
-        for (int i = 0; i < DataConfiguration.getNfold(); i++) {
-            accuracy[i] = nfoldEv.get(i).getAccuracy();
-            precisions[i] = nfoldEv.get(i).getOverallPrecision();
-            recalls[i] = nfoldEv.get(i).getOverallRecall();
-            f1s[i] = nfoldEv.get(i).getOverallF1();
-        }
-
-        writer.append(String.format("accuracy_mean=%s\n", Math.getMean(accuracy)));
-        writer.append(String.format("accuracy_std=%s\n" + Math.getStandardDeviation(accuracy)));
-        writer.append(String.format("precision=%s\n" + Math.getMean(precisions)));
-        writer.append(String.format("recall=%s\n", Math.getMean(recalls)));
-        writer.append(String.format("F1=%s\n", Math.getMean(f1s)));
-        writer.append("\n");
-
-        writer.close();
-
-    }
-
-    private List<MulticlassClassificationEvaluator> getNFoldEvaluator(Kernel usedKernel) {
+    private List<MulticlassClassificationEvaluator> getNFoldEvaluator(Kernel usedKernel, float C) {
 
         // calculating the size of the gram matrix to store all the examples
         int cacheSize = trainingSet.getNumberOfExamples() + testSet.getNumberOfExamples();
@@ -184,6 +142,9 @@ public class KernelParametrization {
         BinaryCSvmClassification svmSolver = new BinaryCSvmClassification();
         //Set the kernel
         svmSolver.setKernel(usedKernel);
+
+        // Set C param
+        svmSolver.setC(C);
 
         // Instantiate the multi-class classifier that apply a One-vs-All schema
         OneVsAllLearning ovaLearner = new OneVsAllLearning();
@@ -210,5 +171,6 @@ public class KernelParametrization {
 
         return ExperimentUtils.nFoldCrossValidation(nfold, ovaLearner, completeDataset, evaluator);
     }
+
 
 }
