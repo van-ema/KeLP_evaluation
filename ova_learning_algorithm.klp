@@ -1,0 +1,45 @@
+{
+  "algorithm" : "oneVsAll",
+  "baseAlgorithm" : {
+    "algorithm" : "binaryCSvmClassification",
+    "cp" : 1.0,
+    "cn" : 1.0,
+    "kernel" : {
+      "kernelType" : "poly",
+      "kernelID" : 1,
+      "baseKernel" : {
+        "kernelType" : "linear",
+        "kernelID" : 2,
+        "representation" : "bow"
+      },
+      "degree" : 2.0,
+      "a" : 1.0,
+      "b" : 0.0,
+      "kernelCache" : {
+        "cacheType" : "fixIndex",
+        "cacheID" : 3,
+        "examplesToStore" : 5952
+      }
+    },
+    "fairness" : false
+  },
+  "labels" : [ {
+    "labelType" : "StringLabel",
+    "className" : "NUM"
+  }, {
+    "labelType" : "StringLabel",
+    "className" : "ENTY"
+  }, {
+    "labelType" : "StringLabel",
+    "className" : "ABBR"
+  }, {
+    "labelType" : "StringLabel",
+    "className" : "HUM"
+  }, {
+    "labelType" : "StringLabel",
+    "className" : "LOC"
+  }, {
+    "labelType" : "StringLabel",
+    "className" : "DESC"
+  } ]
+}

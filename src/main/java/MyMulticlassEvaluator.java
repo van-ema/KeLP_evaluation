@@ -38,7 +38,6 @@ public class MyMulticlassEvaluator extends Evaluator {
         this.overallF1 = 0f;
         this.accuracy = 0f;
 
-
     }
 
     public void addCount(Example example, Prediction prediction) {
@@ -102,18 +101,26 @@ public class MyMulticlassEvaluator extends Evaluator {
     }
 
     public float getOverallPrecision() {
+        if (!computed)
+            compute();
         return overallPrecision;
     }
 
     public float getOverallRecall() {
+        if (!computed)
+            compute();
         return overallRecall;
     }
 
     public float getOverallF1() {
+        if (!computed)
+            compute();
         return overallF1;
     }
 
     public float getAccuracy() {
+        if (!computed)
+            compute();
         return accuracy;
     }
 
